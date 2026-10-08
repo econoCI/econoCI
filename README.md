@@ -17,7 +17,9 @@ econoCI is developed with an AI coding assistant (Claude Code, Anthropic),
 used for design, code, tests and documentation. A person directs the work,
 decides what is built and reviews every change before it is merged.
 
-AI-assisted commits carry a `Co-Authored-By:` line naming the model.
-econoCI itself uses no language model at run time.
+AI-assisted commits carry a `Co-Authored-By:` line. Their message names the
+model, summarizes the prompts that led to the commit, and says what the model
+produced and what the person decided or checked. `specs/provenance-log.md`
+describes the format. econoCI itself uses no language model at run time.
 
 License: Apache-2.0.

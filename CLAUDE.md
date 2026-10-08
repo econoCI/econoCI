@@ -20,7 +20,23 @@ Read `docs/design-mvp.md` first. Apache-2.0.
 - **Rules are deterministic plain functions.** No language model at run time,
   no network calls except to the CI platform's API.
 - **Rules use the root trigger**, not the actor alone.
-- **Mark AI-assisted commits** with the co-author line.
+- **Mark AI-assisted commits** with the co-author line and the `AI-assisted`
+  block from `specs/provenance-log.md`. Run
+  `python3 tools/prompts_since_commit.py` and read `git diff --cached`. Draft
+  `Prompts` from the prompts that shaped the staged diff, in a few lines, and
+  `Output` from the diff. `Human` states what is true now and never claims a
+  review that has not happened. Show the full commit message with
+  `git diff --cached --stat`, name every change no prompt asked for, list the
+  prompts left out of the block, and commit only after explicit approval, with
+  the message exactly as approved.
+- **One commit per unit of work the person asked for.** Do not split work that
+  follows from a single instruction into commits with no prompt of their own.
+- **Merge with a merge commit, and only when told to.** An instruction to
+  merge means the person has reviewed the branch: add
+  `Reviewed-by: <name> <email>` naming that person to the merge commit
+  message. Never add that trailer in any other situation. An AI-assisted
+  commit that reaches `main` without a merge commit needs the trailer itself,
+  and a squash also needs the blocks of the squashed commits.
 
 ## Stack
 
@@ -29,4 +45,5 @@ standard library only so it runs anywhere a customer has Python 3.11.
 
 ## Layout
 
-The product goes under `src/econoci/` as the design describes.
+The product goes under `src/econoci/` as the design describes. Project tooling
+that is not part of the product goes under `tools/`.
