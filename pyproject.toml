@@ -1,0 +1,23 @@
+[project]
+name = "econoci"
+version = "0.0.0"
+description = "Find wasted CI runner time and say what to change."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tools"]
+
+[tool.ruff]
+target-version = "py311"
+# Code blocks in Markdown are illustrations, not code to reformat.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
