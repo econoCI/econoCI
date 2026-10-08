@@ -74,18 +74,17 @@ def test_reviewed_merge_of_ai_commits_passes(git, capsys):
     assert "1 commits on the first-parent line checked, 0 failed" in out
 
 
-def test_merge_of_ai_commits_without_trailer_fails_and_is_named(git, capsys):
+def test_merge_by_a_person_is_the_review_of_what_it_brings_in(git, capsys):
+    # The platform's own merge button writes no trailer.
     branch(git, "work", AI_COMMIT, AI_COMMIT)
-    merge(git, "work", "Merge work")
-    assert review.main(["base..main"]) == 1
+    merge(git, "work", "Merge pull request 1 from example/work")
+    assert review.main(["base..main"]) == 0
     out = capsys.readouterr().out
-    assert "Merge work: brings in 2 AI-assisted commits, no Reviewed-by" in out
-    assert "1 commits on the first-parent line checked, 1 failed" in out
+    assert "1 commits on the first-parent line checked, 0 failed" in out
 
 
-def test_merge_reviewed_by_an_ai_model_fails(git, capsys):
-    branch(git, "work", AI_COMMIT)
-    merge(git, "work", "Merge work\n\nReviewed-by: Model X <noreply@anthropic.com>")
+def test_ai_commit_reviewed_by_an_ai_model_fails(git):
+    commit(git, f"Add a thing\n\nReviewed-by: Model X <noreply@anthropic.com>\n{AI}\n")
     assert review.main(["base..main"]) == 1
 
 

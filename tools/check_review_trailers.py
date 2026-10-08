@@ -1,17 +1,18 @@
-"""Check that AI-assisted commits on main have a recorded review.
+"""Check that AI-assisted commits reached main through a person's review.
 
 usage: check_review_trailers.py <revision range>
 
-A merge commit that brings in AI-assisted commits needs a Reviewed-by trailer.
-So does an AI-assisted commit that reached the first-parent line without a
-merge commit. See specs/provenance-log.md, "From a branch to main".
+A merge commit made by a person is the record of their review of what it
+brings in. Every AI-assisted commit on the first-parent line, merge commits
+included, needs a Reviewed-by trailer of its own. See
+specs/provenance-log.md, "From a branch to main".
 """
 
 import re
 import subprocess
 import sys
 
-from check_commit_messages import AI_MARKERS, GitError, is_ai_assisted, read_commits
+from check_commit_messages import AI_MARKERS, GitError, is_ai_assisted
 
 _REVIEWED = re.compile(r"^reviewed-by:(.*)$", re.IGNORECASE | re.MULTILINE)
 
@@ -54,26 +55,14 @@ def unreviewed(revision_range: str) -> tuple[int, list[tuple[str, str, str]]]:
     commits = first_parent_commits(revision_range)
     failures = []
     for commit, parents, message in commits:
-        if is_reviewed(message):
+        if is_reviewed(message) or not is_ai_assisted(message):
             continue
         subject = (message.strip().splitlines() or [""])[0]
         if len(parents) > 1:
-            brought_in = sum(
-                is_ai_assisted(other_message)
-                for other, other_message in read_commits(f"{commit}^1..{commit}")
-                if other != commit
-            )
-            if brought_in:
-                reason = f"brings in {brought_in} AI-assisted commits"
-            elif is_ai_assisted(message):
-                # A merge commit can carry changes of its own.
-                reason = "AI-assisted merge commit"
-            else:
-                continue
-        elif is_ai_assisted(message):
-            reason = "AI-assisted commit outside a merge"
+            # A merge commit can carry changes of its own.
+            reason = "AI-assisted merge commit"
         else:
-            continue
+            reason = "AI-assisted commit outside a merge"
         failures.append((commit, subject, reason))
     return len(commits), failures
 

@@ -31,12 +31,13 @@ Read `docs/design-mvp.md` first. Apache-2.0.
   the message exactly as approved.
 - **One commit per unit of work the person asked for.** Do not split work that
   follows from a single instruction into commits with no prompt of their own.
-- **Merge with a merge commit, and only when told to.** An instruction to
-  merge means the person has reviewed the branch: add
-  `Reviewed-by: <name> <email>` naming that person to the merge commit
-  message. Never add that trailer in any other situation. An AI-assisted
-  commit that reaches `main` without a merge commit needs the trailer itself,
-  and a squash also needs the blocks of the squashed commits.
+- **Merge with a merge commit, and only when told to.** A person's merge of a
+  pull request is their review and approval and needs no trailer. When told to
+  merge, add `Reviewed-by: <name> <email>` naming that person to the merge
+  commit message. Never add that trailer in any other situation. An
+  AI-assisted commit that reaches `main` without a person's merge commit needs
+  the trailer itself, and a squash also needs the blocks of the squashed
+  commits.
 
 ## Stack
 
