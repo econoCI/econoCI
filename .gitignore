@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.venv/
+.nox/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+junit.xml
+dist/
+
+# collected data and pseudonymization keys never belong in the repository
+*.jsonl.gz
+*.key
+jobs*.json
+mrs.json
+upstream.json
+gh_runs.json
+gh_parts/
