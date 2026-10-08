@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The commit checks read history back to the initial commit.
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Lint and tests
+        run: uvx nox -s lint tests
+      - name: AI-assisted commits carry the AI-assisted block
+        # On a pull request HEAD is a merge commit made by GitHub, so the
+        # range ends at the head of the branch.
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: uvx nox -s commit_messages -- "8076110..$HEAD_SHA"
+      - name: AI-assisted commits on main are reviewed
+        if: github.event_name == 'push'
+        run: uvx nox -s review_trailers

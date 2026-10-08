@@ -139,3 +139,18 @@ def test_missing_ref_is_an_error_without_traceback(git, capsys):
 def test_usage_error_without_a_range(capsys):
     assert review.main([]) == 2
     assert "usage" in capsys.readouterr().err
+
+
+def test_ai_assisted_merge_commit_needs_a_trailer_itself(git, capsys):
+    # A merge commit can carry changes of its own, such as a conflict resolution.
+    branch(git, "work", "Fix a typo")
+    merge(git, "work", f"Merge work\n\n{AI}")
+    assert review.main(["base..main"]) == 1
+    out = capsys.readouterr().out
+    assert "Merge work: AI-assisted merge commit, no Reviewed-by" in out
+
+
+def test_ai_assisted_merge_commit_passes_with_a_trailer(git):
+    branch(git, "work", "Fix a typo")
+    merge(git, "work", f"Merge work\n\n{REVIEWED}\n{AI}")
+    assert review.main(["base..main"]) == 0

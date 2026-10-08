@@ -180,6 +180,8 @@ def session_entries(path: Path) -> list[Entry]:
                 continue
             if origin_kind(record) not in (None, "human"):
                 continue  # a message from another agent, not from the person
+            if record.get("promptSource") == "sdk":
+                continue  # sent by a program, such as an automated review
             feedback = record.get("userFeedback")
             if isinstance(feedback, str) and feedback.strip():
                 # typed when the person rejected a tool call or a plan
@@ -259,23 +261,47 @@ def models(directory: Path, since: datetime) -> set[str]:
     return found
 
 
+def last_before(directory: Path, since: datetime) -> Entry | None:
+    """Return the latest entry before the cut-off, if a live session has one.
+
+    The message that approves a commit is typed before the commit exists, and
+    it often asks for the next step as well.
+    """
+    earlier = [
+        entry
+        for path in live_sessions(directory, since)
+        for entry in session_entries(path)
+        if entry.timestamp < since
+    ]
+    return max(earlier, key=lambda entry: entry.timestamp, default=None)
+
+
+def entry_lines(entry: Entry) -> list[str]:
+    stamp = entry.timestamp.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return [
+        f"{stamp}  {entry.session}  {entry.kind}  {entry.model}",
+        *(f"    {line}" for line in entry.text.splitlines()),
+    ]
+
+
 def render(
     entries: list[Entry],
     since: datetime,
     models: frozenset[str] | set[str] = frozenset(),
+    previous: Entry | None = None,
 ) -> str:
+    lines = []
+    if previous is not None:
+        lines += ["Last entry before the cut-off:", *entry_lines(previous), ""]
     names = sorted({entry.model for entry in entries} | set(models))
-    if not entries:
-        lines = [f"No prompts since {since.isoformat()}."]
-        if names:
-            lines.append(f"Models: {', '.join(names)}")
-        return "\n".join(lines) + "\n"
-    lines = [f"Prompts since {since.isoformat()}", f"Models: {', '.join(names)}"]
+    if entries:
+        lines.append(f"Prompts since {since.isoformat()}")
+    else:
+        lines.append(f"No prompts since {since.isoformat()}.")
+    if names:
+        lines.append(f"Models: {', '.join(names)}")
     for entry in entries:
-        stamp = entry.timestamp.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        lines.append("")
-        lines.append(f"{stamp}  {entry.session}  {entry.kind}  {entry.model}")
-        lines += [f"    {line}" for line in entry.text.splitlines()]
+        lines += ["", *entry_lines(entry)]
     return "\n".join(lines) + "\n"
 
 
@@ -353,13 +379,20 @@ def main(argv: list[str]) -> int:
             raise TranscriptError("no transcript directory for this repository")
         entries: list[Entry] = []
         found: set[str] = set()
+        earlier: list[Entry | None] = []
         for directory in directories:
             if not directory.is_dir():
                 raise TranscriptError(f"no transcript directory at {directory}")
             entries += collect(directory, since)
             found |= models(directory, since)
+            earlier.append(last_before(directory, since))
         entries.sort(key=lambda entry: (entry.timestamp, entry.session))
-        sys.stdout.write(render(entries, since, found))
+        previous = max(
+            (entry for entry in earlier if entry is not None),
+            key=lambda entry: entry.timestamp,
+            default=None,
+        )
+        sys.stdout.write(render(entries, since, found, previous))
     except TranscriptError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

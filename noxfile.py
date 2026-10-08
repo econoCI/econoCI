@@ -22,7 +22,9 @@ def lint(session):
 
 @nox.session(python="3.14")
 def commit_messages(session):
-    session.run("python", "tools/check_commit_messages.py", FIRST_CHECKED_RANGE)
+    # CI passes the range that ends at the head of a pull request.
+    revision_range = session.posargs or [FIRST_CHECKED_RANGE]
+    session.run("python", "tools/check_commit_messages.py", *revision_range)
 
 
 @nox.session(python="3.14")

@@ -65,9 +65,16 @@ def unreviewed(revision_range: str) -> tuple[int, list[tuple[str, str, str]]]:
             )
             if brought_in:
                 reason = f"brings in {brought_in} AI-assisted commits"
-                failures.append((commit, subject, reason))
+            elif is_ai_assisted(message):
+                # A merge commit can carry changes of its own.
+                reason = "AI-assisted merge commit"
+            else:
+                continue
         elif is_ai_assisted(message):
-            failures.append((commit, subject, "AI-assisted commit outside a merge"))
+            reason = "AI-assisted commit outside a merge"
+        else:
+            continue
+        failures.append((commit, subject, reason))
     return len(commits), failures
 
 

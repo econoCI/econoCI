@@ -495,5 +495,61 @@ def test_default_cutoff_is_the_author_date_of_head(tmp_path, monkeypatch, capsys
     monkeypatch.chdir(repo)
     assert psc.main(["--transcripts", str(sessions)]) == 0
     out = capsys.readouterr().out
-    assert "    add a rule" in out
-    assert "too early" not in out
+    # The earlier prompt is shown apart, as the last entry before the cut-off.
+    assert out.index("too early") < out.index("Prompts since")
+    assert out.index("Prompts since") < out.index("    add a rule")
+
+
+def test_prompt_sent_by_a_program_is_left_out(tmp_path):
+    write(
+        tmp_path,
+        "aaaaaaaa-1",
+        [
+            user(T1, "Review this change.", promptSource="sdk"),
+            user(T2, "add a rule", promptSource="typed"),
+            user(T3, "yes, do that", promptSource="suggestion_accepted"),
+        ],
+    )
+    assert texts(psc.collect(tmp_path, SINCE)) == [
+        ("prompt", "add a rule"),
+        ("prompt", "yes, do that"),
+    ]
+
+
+def test_last_entry_before_the_cutoff_is_found(tmp_path):
+    # The message that approves a commit often also asks for the next step.
+    write(
+        tmp_path,
+        "aaaaaaaa-1",
+        [user("2026-01-02T11:00:00.000Z", "oldest"), user(T1, "after")],
+    )
+    write(tmp_path, "bbbbbbbb-2", [user(BEFORE, "approved, now add CI"), reply(T2)])
+    previous = psc.last_before(tmp_path, SINCE)
+    assert (previous.session, previous.text) == ("bbbbbbbb", "approved, now add CI")
+
+
+def test_no_entry_before_the_cutoff(tmp_path):
+    write(tmp_path, "aaaaaaaa-1", [user(T1, "after")])
+    assert psc.last_before(tmp_path, SINCE) is None
+
+
+def test_render_shows_the_entry_before_the_cutoff_apart():
+    before = psc.Entry(
+        datetime(2026, 1, 2, 11, 59, 59, tzinfo=UTC),
+        "bbbbbbbb",
+        "prompt",
+        "approved, now add CI",
+        "model-x-1",
+    )
+    after = psc.Entry(SINCE, "aaaaaaaa", "prompt", "first", "model-x-1")
+    assert psc.render([after], SINCE, previous=before).splitlines() == [
+        "Last entry before the cut-off:",
+        "2026-01-02T11:59:59Z  bbbbbbbb  prompt  model-x-1",
+        "    approved, now add CI",
+        "",
+        "Prompts since 2026-01-02T12:00:00+00:00",
+        "Models: model-x-1",
+        "",
+        "2026-01-02T12:00:00Z  aaaaaaaa  prompt  model-x-1",
+        "    first",
+    ]

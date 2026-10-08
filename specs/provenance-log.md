@@ -100,8 +100,12 @@ keeps locally.
   that belong to the next commit;
 - prints to the terminal only. It writes no file and nothing it prints is
   committed as is;
+- also prints the last entry before that date, set apart: the message that
+  approves a commit is typed before the commit exists and often asks for the
+  next step as well;
 - leaves out text injected by the harness (system reminders, skill bodies,
-  hook context), tool output, and the assistant's replies;
+  hook context), prompts sent by a program such as an automated review, tool
+  output, and the assistant's replies;
 - stops with an error naming any transcript record type it does not know. The
   transcript format is internal to Claude Code and can change;
 - standard library only, no network calls, no language model.
@@ -123,6 +127,22 @@ summary is true. The person's approval is the control for that.
 commit reached `main` without a recorded review (next section). A `nox`
 session runs it over `8076110..main`. It checks `main` and not the current
 branch, because commits on a branch are not reviewed yet.
+
+## CI
+
+The checks also run on the hosting platform, from `.github/workflows/ci.yml`:
+
+- on every pull request: tests, lint, and the block check over every commit
+  from `8076110` to the head of the pull request;
+- on every push to `main`: the same, and the review check over
+  `8076110..main`.
+
+Two repository settings belong to this specification: only merge commits are
+allowed (squash and rebase merging are off), and `main` takes changes through
+pull requests whose checks passed.
+
+The review check runs after the merge. On a pushed `main` it can report a
+missing trailer and cannot prevent it.
 
 ## From a branch to main
 
@@ -146,9 +166,9 @@ be on record in the repository.
   message also carries the blocks of the squashed commits, merged into one
   block.
 - The rule the review check enforces: on the first-parent history of `main`, a
-  merge commit that brings in at least one AI-assisted commit has a
-  `Reviewed-by:` trailer, and an AI-assisted commit that is not brought in by
-  a merge commit has one itself. A trailer that names an AI model does not
+  merge commit that brings in at least one AI-assisted commit, or is itself
+  AI-assisted, has a `Reviewed-by:` trailer, and an AI-assisted commit that is
+  not brought in by a merge commit has one itself. A trailer that names an AI model does not
   count.
 - The pull request description is not a provenance record. It lives on the
   platform, not in the repository.
@@ -187,6 +207,8 @@ Review check, each case built as a small git history:
 - a merge commit with the trailer that brings in AI-assisted commits passes;
 - the same merge commit without the trailer fails and names it;
 - a merge commit that brings in no AI-assisted commit passes without one;
+- an AI-assisted merge commit needs the trailer even when it brings in no
+  AI-assisted commit;
 - an AI-assisted commit directly on the first-parent line fails without the
   trailer and passes with it;
 - a trailer that names an AI model does not count;
@@ -198,7 +220,7 @@ This introduces the repository's first `pyproject.toml` and `noxfile.py`
 ## Not included
 
 - Publishing conversation transcripts, in full or redacted.
-- A `commit-msg` git hook. The check runs through `nox`, and later in CI.
+- A `commit-msg` git hook. The checks run through `nox`, locally and in CI.
 - The disclosure for the grant application. The proposal form asks, when
   generative AI was used in writing the proposal, for the model, what it was
   used for, and the prompts and output pasted (up to 8000 characters) or
