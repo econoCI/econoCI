@@ -124,7 +124,8 @@ It checks that the block is present and complete. It cannot check that the
 summary is true. The person's approval is the control for that.
 
 `tools/check_review_trailers.py <revision range>` fails when an AI-assisted
-commit reached `main` without a recorded review (next section). A `nox`
+commit reached `main` without a person's review on record (see "From a branch
+to main"). A `nox`
 session runs it over `8076110..main`. It checks `main` and not the current
 branch, because commits on a branch are not reviewed yet.
 
@@ -142,7 +143,7 @@ allowed (squash and rebase merging are off), and `main` takes changes through
 pull requests whose checks passed.
 
 The review check runs after the merge. On a pushed `main` it can report a
-missing trailer and cannot prevent it.
+commit that bypassed review and cannot prevent it.
 
 ## From a branch to main
 
@@ -152,24 +153,27 @@ be on record in the repository.
 - Branches are merged with a merge commit. It keeps every commit message, so
   each block reaches `main` as approved, and `git log` on `main` shows it.
 - The person reviews the code before the merge, usually in the pull request.
-  The review is recorded in the merge commit message with the trailer
-  `Reviewed-by: <name> <email>`, naming the person who reviewed. The merge
-  commit is the one point in the history that lies after the review.
+- The merge commit is the record of that review. A person who merges a pull
+  request, with the platform's own merge button or otherwise, has reviewed and
+  approved what the merge brings in. The merge commit needs no trailer to say
+  so. It is the one point in the history that lies after the review.
 - The merge commit is the person's commit. It has no `Co-Authored-By:` trailer
   and no block.
 - The assistant merges only when the person tells it to. That instruction
-  means the person has reviewed the branch, and the assistant adds the trailer
-  naming that person. It never adds the trailer in any other situation.
-- An AI-assisted commit that reaches `main` without a merge commit (a rebase
-  merge, a squash merge, a commit made directly on `main`) carries the
-  `Reviewed-by:` trailer itself. A squash is allowed only when its commit
-  message also carries the blocks of the squashed commits, merged into one
-  block.
-- The rule the review check enforces: on the first-parent history of `main`, a
-  merge commit that brings in at least one AI-assisted commit, or is itself
-  AI-assisted, has a `Reviewed-by:` trailer, and an AI-assisted commit that is
-  not brought in by a merge commit has one itself. A trailer that names an AI model does not
-  count.
+  means the person has reviewed the branch. The assistant then adds
+  `Reviewed-by: <name> <email>`, naming that person, to the merge commit
+  message, so the history shows the merge was made on instruction. It never
+  adds that trailer in any other situation.
+- An AI-assisted commit that reaches `main` without a person's merge commit (a
+  rebase merge, a squash merge, a commit made directly on `main`) carries a
+  `Reviewed-by:` trailer itself. So does a merge commit that is itself
+  AI-assisted, since a merge can carry changes of its own. A squash is allowed
+  only when its commit message also carries the blocks of the squashed
+  commits, merged into one block.
+- The rule the review check enforces: on the first-parent history of `main`,
+  every AI-assisted commit, merge commits included, has a `Reviewed-by:`
+  trailer. A trailer that names an AI model does not count. Commits brought in
+  by a merge commit are not on that line and are covered by the merge.
 - The pull request description is not a provenance record. It lives on the
   platform, not in the repository.
 
@@ -179,8 +183,9 @@ be on record in the repository.
   `Co-Authored-By:` is extended to say that each AI-assisted commit message
   summarizes the prompts and names the model.
 - `CLAUDE.md`, working rules: the rule "Mark AI-assisted commits" is extended
-  with the block and the approval step, and a rule on merging states the
-  merge commit, the `Reviewed-by:` trailer and when the assistant adds it.
+  with the block and the approval step, and a rule on merging states that a
+  person's merge commit is the review, and when the assistant adds the
+  `Reviewed-by:` trailer.
 
 ## Tests
 
@@ -204,11 +209,9 @@ Check:
 
 Review check, each case built as a small git history:
 
-- a merge commit with the trailer that brings in AI-assisted commits passes;
-- the same merge commit without the trailer fails and names it;
-- a merge commit that brings in no AI-assisted commit passes without one;
-- an AI-assisted merge commit needs the trailer even when it brings in no
-  AI-assisted commit;
+- a merge commit made by a person passes without a trailer, whether or not
+  it brings in AI-assisted commits;
+- an AI-assisted merge commit fails without the trailer and passes with it;
 - an AI-assisted commit directly on the first-parent line fails without the
   trailer and passes with it;
 - a trailer that names an AI model does not count;
@@ -234,8 +237,12 @@ This introduces the repository's first `pyproject.toml` and `noxfile.py`
   model selects which prompts it covers. Nothing compares it with the
   transcript except the person's review of the message and of the left-out
   prompts.
-- `Reviewed-by:` is an assertion. Nothing proves that the review happened or
-  how careful it was. It makes one named person accountable in the history.
+- A merge commit is an assertion. Nothing proves that the review happened or
+  how careful it was. It makes the person who merged accountable in the
+  history.
+- The check cannot tell a merge the person made from one the assistant made
+  with the person's account without being told to. The working rule that the
+  assistant merges only on instruction is the control for that.
 - Claude Code deletes old transcripts after a retention period. Questions from
   NLnet about a commit, and the proposal disclosure, can be answered from the
   transcripts only while they still exist. Keeping a private copy is the
