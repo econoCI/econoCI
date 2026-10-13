@@ -7,7 +7,7 @@ nox.options.sessions = ["lint", "tests", "commit_messages", "review_trailers"]
 FIRST_CHECKED_RANGE = "8076110..HEAD"
 
 
-@nox.session(python="3.14")
+@nox.session(python=["3.11", "3.14"])
 def tests(session):
     session.install("pytest")
     session.run("pytest", *session.posargs)
