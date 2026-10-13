@@ -23,12 +23,13 @@ Read `docs/design-mvp.md` first. Apache-2.0.
 - **Mark AI-assisted commits** with the co-author line and the `AI-assisted`
   block from `specs/provenance-log.md`. Run
   `python3 tools/prompts_since_commit.py` and read `git diff --cached`. Draft
-  `Prompts` from the prompts that shaped the staged diff, in a few lines, and
-  `Output` from the diff. `Human` states what is true now and never claims a
-  review that has not happened. Show the full commit message with
-  `git diff --cached --stat`, name every change no prompt asked for, list the
-  prompts left out of the block, and commit only after explicit approval, with
-  the message exactly as approved.
+  `Prompts` as a summary, in a few plain sentences, of the prompts that shaped
+  the staged diff. Do not list quoted prompts; quote one only when its exact
+  wording is the decision. Draft `Output` from the diff. `Human` states what
+  is true now and never claims a review that has not happened. Show the full
+  commit message with `git diff --cached --stat`, name every change no prompt
+  asked for, list the prompts left out of the block, and commit only after
+  explicit approval, with the message exactly as approved.
 - **One commit per unit of work the person asked for.** Do not split work that
   follows from a single instruction into commits with no prompt of their own.
 - **Merge with a merge commit, and only when told to.** A person's merge of a

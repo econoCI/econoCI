@@ -42,8 +42,9 @@ Human: <what the person decided, changed or verified>
   it, and the decisions and corrections that are visible in its diff. It is
   not a record of the conversation. A direction that was tried and dropped
   left no trace in the diff and is left out. A prompt belongs to the commit
-  where its effect lands. The field is a few lines long; short instructions
-  that shaped the result are quoted.
+  where its effect lands. The field is a few lines long and is written as
+  a summary in plain sentences. It is not a list of quoted prompts. A prompt
+  is quoted only when its exact wording is the decision.
 - `Output` says which parts of the commit the model drafted. The diff is the
   output itself.
 - `Human` records what the person did beyond asking: a proposal rejected, a
