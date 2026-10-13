@@ -35,6 +35,9 @@ FORMAT = 1
 # A small gzip file can expand to one enormous line. No record comes near
 # this: the largest is a CI file stored as text.
 MAX_LINE = 16 * 1024 * 1024
+# Many small records expand as far as one long line does, and every record
+# stays in memory. Two GiB of text is several million jobs.
+MAX_TOTAL = 2 * 1024 * 1024 * 1024
 
 
 class DatasetError(Exception):
@@ -331,8 +334,14 @@ def _parse(lines: Iterable[str], source: str) -> Dataset:
     records: dict[str, list] = {kind: [] for kind in SCHEMAS if kind != "meta"}
     ids: dict[str, set[str]] = {"run": set(), "job": set(), "change_request": set()}
     job_lines: list[tuple[str, Job]] = []
+    total = 0
     for number, line in enumerate(lines, 1):
         where = f"{source}:{number}"
+        total += len(line) + 1
+        if total > MAX_TOTAL:
+            raise DatasetError(
+                f"{where}: the dataset is larger than {MAX_TOTAL} characters"
+            )
         if len(line) > MAX_LINE:
             raise DatasetError(f"{where}: line longer than {MAX_LINE} characters")
         if not line.strip():

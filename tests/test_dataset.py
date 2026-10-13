@@ -665,3 +665,35 @@ def test_write_refuses_a_line_longer_than_the_limit(tmp_path, monkeypatch):
     with pytest.raises(dataset.DatasetError, match="line longer than 100"):
         dataset.write(good, tmp_path / "long.jsonl.gz")
     assert not (tmp_path / "long.jsonl.gz").exists()
+
+
+def test_a_file_larger_than_the_limit_is_rejected(tmp_path, monkeypatch):
+    # Many small records expand as far as one long line does.
+    rows = [meta(), *[run(id=f"r{number}") for number in range(50)]]
+    monkeypatch.setattr(dataset, "MAX_TOTAL", 3000)
+    with pytest.raises(dataset.DatasetError) as caught:
+        dataset.read(save(tmp_path, rows))
+    message = str(caught.value)
+    assert "larger than 3000 characters" in message
+    assert "data.jsonl.gz:" in message
+    line = int(message.split("data.jsonl.gz:")[1].split(":")[0])
+    assert 2 < line < 20
+
+
+def test_a_file_at_the_limit_is_accepted(tmp_path, monkeypatch):
+    rows = [meta(), run()]
+    path = save(tmp_path, rows)
+    total = sum(len(json.dumps(row)) + 1 for row in rows)
+    monkeypatch.setattr(dataset, "MAX_TOTAL", total)
+    assert len(dataset.read(path).runs) == 1
+    monkeypatch.setattr(dataset, "MAX_TOTAL", total - 1)
+    with pytest.raises(dataset.DatasetError, match="larger than"):
+        dataset.read(path)
+
+
+def test_write_refuses_a_dataset_larger_than_the_limit(tmp_path, monkeypatch):
+    good = dataset.read(save(tmp_path, [meta(), run(), config()]))
+    monkeypatch.setattr(dataset, "MAX_TOTAL", 200)
+    with pytest.raises(dataset.DatasetError, match="larger than 200 characters"):
+        dataset.write(good, tmp_path / "big.jsonl.gz")
+    assert not (tmp_path / "big.jsonl.gz").exists()

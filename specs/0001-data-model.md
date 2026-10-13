@@ -217,6 +217,7 @@ An error names the file and the line, and nothing is returned, when:
 - the file is not gzip or is cut short, or a line is empty or not a JSON
   object;
 - a line has the same key twice, or is longer than 16 MiB;
+- the file holds more than 2 GiB of text once unpacked;
 - a number is not finite, or a text cannot be written as UTF-8;
 - the first line is not a `meta` record, or a second `meta` record appears;
 - `format` is not `1`;
