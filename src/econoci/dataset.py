@@ -32,6 +32,12 @@ from econoci.model import (
 )
 
 FORMAT = 1
+# A small gzip file can expand to one enormous line. No record comes near
+# this: the largest is a CI file stored as text.
+MAX_LINE = 16 * 1024 * 1024
+# Many small records expand as far as one long line does, and every record
+# stays in memory. Two GiB of text is several million jobs.
+MAX_TOTAL = 2 * 1024 * 1024 * 1024
 
 
 class DatasetError(Exception):
@@ -183,6 +189,16 @@ ROOT_OF = (
 )
 
 
+def _show(value: object) -> str:
+    """Return a value from a file in a form that is safe to print.
+
+    repr escapes control characters, so the value cannot alter a terminal or
+    forge a log line, and the result is cut so one value cannot flood either.
+    """
+    text = repr(value)
+    return text if len(text) <= 80 else text[:77] + "..."
+
+
 class _DuplicateKey(Exception):
     pass
 
@@ -240,7 +256,7 @@ def _decode(field: Field, value: object, where: str) -> object:
     if not all(_encodable(text) for text in texts):
         raise DatasetError(f"{where}: {field.key} is not valid text")
     if field.values is not None and value not in field.values:
-        raise DatasetError(f"{where}: {field.key} has the unknown value {value!r}")
+        raise DatasetError(f"{where}: {field.key} has the unknown value {_show(value)}")
     if field.type == "timestamp":
         try:
             stamp = datetime.fromisoformat(value)
@@ -257,11 +273,11 @@ def _decode(field: Field, value: object, where: str) -> object:
 def _record(row: dict, where: str) -> tuple[str, object]:
     kind = row.get("kind")
     if not isinstance(kind, str) or kind not in SCHEMAS:
-        raise DatasetError(f"{where}: unknown kind {kind!r}")
+        raise DatasetError(f"{where}: unknown kind {_show(kind)}")
     record_type, fields = SCHEMAS[kind]
     extra = sorted(set(row) - {"kind"} - {field.key for field in fields})
     if extra:
-        raise DatasetError(f"{where}: unknown key {extra[0]!r}")
+        raise DatasetError(f"{where}: unknown key {_show(extra[0])}")
     values = {}
     for field in fields:
         if field.key in row:
@@ -318,14 +334,24 @@ def _parse(lines: Iterable[str], source: str) -> Dataset:
     records: dict[str, list] = {kind: [] for kind in SCHEMAS if kind != "meta"}
     ids: dict[str, set[str]] = {"run": set(), "job": set(), "change_request": set()}
     job_lines: list[tuple[str, Job]] = []
+    total = 0
     for number, line in enumerate(lines, 1):
         where = f"{source}:{number}"
+        total += len(line) + 1
+        if total > MAX_TOTAL:
+            raise DatasetError(
+                f"{where}: the dataset is larger than {MAX_TOTAL} characters"
+            )
+        if len(line) > MAX_LINE:
+            raise DatasetError(f"{where}: line longer than {MAX_LINE} characters")
         if not line.strip():
             raise DatasetError(f"{where}: empty line")
         try:
             row = json.loads(line, object_pairs_hook=_object, parse_constant=_constant)
         except _DuplicateKey as error:
-            raise DatasetError(f"{where}: duplicate key {error.args[0]!r}") from error
+            raise DatasetError(
+                f"{where}: duplicate key {_show(error.args[0])}"
+            ) from error
         except (ValueError, RecursionError) as error:
             # ValueError covers a syntax error, NaN and a number too long to parse.
             reason = getattr(error, "msg", None) or str(error) or type(error).__name__
@@ -338,7 +364,7 @@ def _parse(lines: Iterable[str], source: str) -> Dataset:
             # Checked before the keys: a later format may have other keys.
             if row.get("format") != FORMAT:
                 raise DatasetError(
-                    f"{where}: format {row.get('format')} is not supported, "
+                    f"{where}: format {_show(row.get('format'))} is not supported, "
                     f"this version reads format {FORMAT}"
                 )
             meta = _record(row, where)[1]
@@ -348,7 +374,7 @@ def _parse(lines: Iterable[str], source: str) -> Dataset:
             raise DatasetError(f"{where}: a second meta record")
         if kind in ids:
             if record.id in ids[kind]:
-                raise DatasetError(f"{where}: duplicate {kind} id {record.id!r}")
+                raise DatasetError(f"{where}: duplicate {kind} id {_show(record.id)}")
             ids[kind].add(record.id)
         _check(kind, record, meta, where)
         records[kind].append(record)
@@ -359,7 +385,8 @@ def _parse(lines: Iterable[str], source: str) -> Dataset:
     for where, job in job_lines:
         if job.run not in ids["run"]:
             raise DatasetError(
-                f"{where}: the job names the run {job.run!r}, which is not in the file"
+                f"{where}: the job names the run {_show(job.run)}, "
+                "which is not in the file"
             )
     return Dataset(
         meta=meta,
@@ -370,12 +397,22 @@ def _parse(lines: Iterable[str], source: str) -> Dataset:
     )
 
 
+def _bounded(handle) -> Iterator[str]:
+    """Yield the lines of a file without ever holding more than the limit.
+
+    A line that exceeds the limit is passed on cut off, still too long, and
+    the parser rejects it with its line number.
+    """
+    while line := handle.readline(MAX_LINE + 2):
+        yield line.rstrip("\n")
+
+
 def read(path: Path | str) -> Dataset:
     """Read a dataset file, or raise DatasetError naming the file and the line."""
     path = Path(path)
     try:
         with gzip.open(path, "rt", encoding="utf-8", newline="\n") as handle:
-            return _parse((line.rstrip("\n") for line in handle), str(path))
+            return _parse(_bounded(handle), str(path))
     except (OSError, EOFError, zlib.error, UnicodeDecodeError) as error:
         raise DatasetError(f"{path}: cannot read the file ({error})") from error
 

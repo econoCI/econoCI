@@ -216,7 +216,8 @@ An error names the file and the line, and nothing is returned, when:
 
 - the file is not gzip or is cut short, or a line is empty or not a JSON
   object;
-- a line has the same key twice;
+- a line has the same key twice, or is longer than 16 MiB;
+- the file holds more than 2 GiB of text once unpacked;
 - a number is not finite, or a text cannot be written as UTF-8;
 - the first line is not a `meta` record, or a second `meta` record appears;
 - `format` is not `1`;
@@ -235,6 +236,9 @@ An error names the file and the line, and nothing is returned, when:
   (an unresolved chain is `null`), has a `root_trigger` without a
   `root_platform_trigger`, or has other `root_*` values next to a `null`
   `root_trigger`.
+
+An error message shows a value from the file escaped and cut to a short
+length, so a file cannot alter a terminal or forge a line in a log.
 
 Allowed, because the other record can lie outside the collected period or in
 a repository the collector could not read:
